@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Visualisation des données</title>
+
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- PapaParse : lecture du CSV -->
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.3/papaparse.min.js"></script>
+</head>
+
+<body>
+
+    <header>
+        <h1>🎬 Analyse des films</h1>
+        <p>Visualisation interactive des données</p>
+    </header>
+
+    <main>
+
+        <!-- Statistiques -->
+        <section class="stats">
+
+            <div class="card">
+                <span>Total utilisateurs</span>
+                <strong id="totalUsers">0</strong>
+            </div>
+
+            <div class="card">
+                <span>Âge moyen</span>
+                <strong id="averageAge">0</strong>
+            </div>
+
+            <div class="card">
+                <span>Films différents</span>
+                <strong id="totalFilms">0</strong>
+            </div>
+
+        </section>
+
+        <!-- Graphique -->
+        <section class="chart-container">
+
+            <h2>Distribution des âges</h2>
+
+            <canvas id="ageChart"></canvas>
+
+        </section>
+
+        <!-- Filtre -->
+        <section class="controls">
+
+            <label for="filmFilter">
+                Filtrer par film :
+            </label>
+
+            <select id="filmFilter">
+                <option value="all">Tous les films</option>
+            </select>
+
+        </section>
+
+        <!-- Tableau -->
+        <section class="table-container">
+
+            <table>
+
+                <thead>
+                    <tr>
+                        <th>Pseudo</th>
+                        <th>Âge</th>
+                        <th>Film préféré</th>
+                    </tr>
+                </thead>
+
+                <tbody id="dataTable">
+                </tbody>
+
+            </table>
+
+        </section>
+
+    </main>
+
+    <script src="script.js"></script>
+
+</body>
+</html>
