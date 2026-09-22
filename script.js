@@ -1,9 +1,13 @@
 let donnees = [];
 let graphique;
 
+const GOOGLE_SHEET_URL ="https://docs.google.com/spreadsheets/d/e/2PACX-1vQHhsse8N5a_QRo7exyuT8x6LMX1r7L_tm1B3vbmR-C-7tB9j2BZHydpuKGwdtrk8nr1XXsphOcCpqT/pub?output=csv"
 
-// Charger le fichier CSV
-Papa.parse("donnees_films_200_lignes.csv", {
+// ==========================================
+// CHARGEMENT DES DONNÉES GOOGLE SHEETS
+// ==========================================
+
+Papa.parse(GOOGLE_SHEET_URL, {
 
     download: true,
 
@@ -15,6 +19,8 @@ Papa.parse("donnees_films_200_lignes.csv", {
 
         donnees = result.data;
 
+        console.log("Données reçues :", donnees);
+
         afficherStatistiques();
 
         remplirFiltre();
@@ -22,7 +28,18 @@ Papa.parse("donnees_films_200_lignes.csv", {
         afficherTableau(donnees);
 
         creerGraphique(donnees);
+    },
 
+    error: function(error) {
+
+        console.error(
+            "Erreur lors du chargement :",
+            error
+        );
+
+        alert(
+            "Impossible de charger les données Google Sheets."
+        );
     }
 
 });
