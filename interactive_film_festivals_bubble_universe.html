@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Univers des Festivals de Cinéma</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- p5.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
+  
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background-color: #0b0f19;
+      color: #e2e8f0;
+      user-select: none;
+    }
+    
+    canvas {
+      display: block;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+    
+    /* Custom scrollbar for modern modal look */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.6);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(99, 102, 241, 0.5);
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(99, 102, 241, 0.8);
+    }
+    
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .btn-action {
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .btn-action:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px -3px rgba(99, 102, 241, 0.4);
+    }
+    .btn-action:active {
+      transform: translateY(0);
+    }
+    .btn-active {
+      background: linear-gradient(135deg, #4f46e5, #7c3aed) !important;
+      border-color: rgba(167, 139, 250, 0.5) !important;
+      color: white !important;
+      box-shadow: 0 0 15px rgba(124, 58, 237, 0.5);
+    }
+  </style>
+</head>
+<body class="relative w-screen h-screen overflow-hidden">
+
+  <!-- UI Navigation Controls Header -->
+  <div class="absolute top-0 left-0 w-full z-20 p-4 pointer-events-none flex flex-wrap justify-between items-center gap-3">
+    
+    <!-- Grouping & Visual Modes (Left Side Controls) -->
+    <div class="flex flex-wrap gap-2 pointer-events-auto glass-panel p-2 rounded-2xl shadow-2xl">
+      <button id="btn-free" onclick="setMode('free')" class="btn-action btn-active px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700/50">
+        <i class="fa-solid fa-atom text-indigo-400"></i>
+        <span>Libre</span>
+      </button>
+
+      <button id="btn-region" onclick="setMode('region')" class="btn-action px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700/50">
+        <i class="fa-solid fa-map-location-dot text-emerald-400"></i>
+        <span>Par Région</span>
+      </button>
+
+      <button id="btn-genre" onclick="setMode('genre')" class="btn-action px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700/50">
+        <i class="fa-solid fa-film text-pink-400"></i>
+        <span>Par Genre</span>
+      </button>
+
+      <button id="btn-seasons" onclick="setMode('seasons')" class="btn-action px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700/50">
+        <i class="fa-solid fa-sun text-amber-400"></i>
+        <span>Univers Saisons <i class="fa-solid fa-music ml-1 text-xs text-amber-300"></i></span>
+      </button>
+    </div>
+
+    <!-- Physics & Action Effects (Right Side Controls) -->
+    <div class="flex flex-wrap gap-2 pointer-events-auto glass-panel p-2 rounded-2xl shadow-2xl">
+      <button id="btn-gravity" onclick="toggleGravity()" class="btn-action px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700/50">
+        <i class="fa-solid fa-arrow-down-long text-cyan-400"></i>
+        <span id="gravity-label">Gravité: OFF</span>
+      </button>
+
+      <button id="btn-explode" onclick="explodeCircles()" class="btn-action px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 bg-rose-600/90 hover:bg-rose-500 text-white border border-rose-400/30">
+        <i class="fa-solid fa-burst text-yellow-300"></i>
+        <span>Exploser</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Real-time Info Overlay & Audio Indicator -->
+  <div class="absolute bottom-4 left-4 z-10 pointer-events-none glass-panel px-4 py-2.5 rounded-xl text-xs text-slate-400 flex items-center gap-3">
+    <div class="flex items-center gap-2">
+      <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+      <span id="count-label" class="font-medium text-slate-200">Chargement...</span>
+    </div>
+    <div id="season-audio-badge" class="hidden flex items-center gap-2 border-l border-slate-700 pl-3 text-amber-400">
+      <i class="fa-solid fa-volume-high animate-pulse"></i>
+      <span id="active-season-name">Saison: --</span>
+    </div>
+  </div>
+
+  <!-- Help Hint HUD -->
+  <div class="absolute bottom-4 right-4 z-10 pointer-events-none glass-panel px-4 py-2.5 rounded-xl text-xs text-slate-400 hidden sm:flex items-center gap-2">
+    <i class="fa-solid fa-hand-pointer text-indigo-400"></i>
+    <span>Glisser pour projeter • Clic pour détails</span>
+  </div>
+
+  <!-- Details Popup Modal -->
+  <div id="modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md opacity-0 pointer-events-none transition-opacity duration-300">
+    <div class="glass-panel w-full max-w-lg rounded-3xl p-6 sm:p-8 border border-white/20 shadow-2xl relative transform transition-all duration-300 scale-95" id="modal-content">
+      
+      <!-- Close Button -->
+      <button onclick="closeModal()" class="absolute top-5 right-5 w-9 h-9 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition-colors">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+
+      <!-- Festival Header -->
+      <div class="flex items-start gap-4 mb-4">
+        <div id="modal-color-badge" class="w-12 h-12 rounded-2xl flex items-center justify-center text-white text-xl shadow-lg shrink-0">
+          <i class="fa-solid fa-film"></i>
+        </div>
+        <div>
+          <h2 id="modal-title" class="text-xl sm:text-2xl font-bold text-white tracking-tight leading-snug">Nom du Festival</h2>
+          <p id="modal-commune-region" class="text-sm text-indigo-300 font-medium mt-0.5">Commune, Région</p>
+        </div>
+      </div>
+
+      <!-- Metadata Grid -->
+      <div class="grid grid-cols-2 gap-3 my-5 text-xs sm:text-sm">
+        <div class="bg-slate-900/60 p-3.5 rounded-2xl border border-slate-800">
+          <span class="text-slate-400 block text-xs mb-1">Année de création</span>
+          <span id="modal-year" class="font-bold text-slate-100 text-base">---</span>
+        </div>
+        <div class="bg-slate-900/60 p-3.5 rounded-2xl border border-slate-800">
+          <span class="text-slate-400 block text-xs mb-1">Saison</span>
+          <span id="modal-season" class="font-bold text-slate-100 text-base">---</span>
+        </div>
+        <div class="col-span-2 bg-slate-900/60 p-3.5 rounded-2xl border border-slate-800">
+          <span class="text-slate-400 block text-xs mb-1">Genre / Thématiques</span>
+          <span id="modal-genre" class="font-semibold text-pink-300">---</span>
+        </div>
+        <div id="modal-dept-box" class="col-span-2 bg-slate-900/60 p-3.5 rounded-2xl border border-slate-800">
+          <span class="text-slate-400 block text-xs mb-1">Département</span>
+          <span id="modal-dept" class="font-semibold text-slate-200">---</span>
+        </div>
+      </div>
+
+      <!-- Action Link -->
+      <div class="mt-6 flex justify-end">
+        <a id="modal-link" href="#" target="_blank" rel="noopener noreferrer" class="w-full sm:w-auto text-center px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30">
+          <span>Visiter le site web</span>
+          <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- P5 Code Script -->
+  <script>
+    // Data & Simulation Constants
+    const DATA_URL = "https://raw.githubusercontent.com/Jean-Deluxe/s01e01_graphique_simple/refs/heads/main/festivals_cinema_684.json";
+    
+    let rawFestivalsData = [];
+    let circles = [];
+    let mode = 'free'; // modes: 'free', 'region', 'genre', 'seasons'
+    let isGravityActive = false;
+    let draggedCircle = null;
+    let mouseVelocity = { x: 0, y: 0 };
+    let prevMousePos = { x: 0, y: 0 };
+    
+    // Clusters spatial metadata
+    let clusterTargets = {};
+    let activeSeasonAudio = null;
+
+    // Web Audio Synthesizer Engine
+    let audioCtx = null;
+    let synthOsc = null;
+    let synthGain = null;
+    let currentSeasonNote = "";
+
+    const SEASON_FREQS = {
+      "Printemps": [261.63, 329.63, 392.00], // C major harmonic shimmer
+      "Été": [349.23, 440.00, 523.25],       // F major bright resonance
+      "Automne": [220.00, 261.63, 329.63],   // A minor cozy warmth
+      "Hiver": [174.61, 207.65, 261.63]      // Low F minor ambient chill
+    };
+
+    // Color Generation Palette based on String Hash
+    function stringToColor(str) {
+      if (!str) return "#6366f1";
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      const h = Math.abs(hash) % 360;
+      return `hsl(${h}, 75%, 60%)`;
+    }
+
+    // p5.js Setup
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      ellipseMode(CENTER);
+      fetchFestivalData();
+    }
+
+    // Fetch and Initialize Festivals Data
+    async function fetchFestivalData() {
+      try {
+        const res = await fetch(DATA_URL);
+        rawFestivalsData = await res.json();
+        document.getElementById('count-label').innerText = `${rawFestivalsData.length} Festivals Chargés`;
+        initCircles();
+      } catch (err) {
+        console.error("Erreur de chargement des données:", err);
+        document.getElementById('count-label').innerText = "Erreur de chargement";
+      }
+    }
+
+    // Circle Physics Object Definition
+    class CircleParticle {
+      constructor(data, index) {
+        this.data = data;
+        this.index = index;
+        
+        // Year Parsing & Radius Mapping
+        let year = parseInt(data.annee_creation_du_festival) || 2000;
+        // Map older years to larger radii, newer to smaller (or vice-versa)
+        // Mapped gracefully between 7px and 24px radius
+        this.year = year;
+        this.r = map(year, 1900, 2024, 22, 9, true); 
+
+        // Initial Positions & Velocities
+        this.x = random(this.r + 20, width - this.r - 20);
+        this.y = random(this.r + 20, height - this.r - 20);
+        this.vx = random(-1.5, 1.5);
+        this.vy = random(-1.5, 1.5);
+        
+        // Material & Color Properties
+        this.colorStr = stringToColor(data.nom_du_festival || `Fest_${index}`);
+        this.mass = this.r * 0.1;
+        this.isHovered = false;
+
+        // Categorizations
+        this.region = data.region || "Non renseigné";
+        this.genre = data.genres_texte_brut || "Autre";
+        this.season = getSeasonFromData(data);
+      }
+
+      update() {
+        if (this === draggedCircle) {
+          this.x = mouseX;
+          this.y = mouseY;
+          this.vx = mouseVelocity.x * 0.5;
+          this.vy = mouseVelocity.y * 0.5;
+          return;
+        }
+
+        // Apply Forces based on Mode & Physics State
+        if (mode === 'free') {
+          if (isGravityActive) {
+            this.vy += 0.35; // Gravity pull
+          } else {
+            // Gentle organic roaming impulse
+            this.vx += random(-0.05, 0.05);
+            this.vy += random(-0.05, 0.05);
+          }
+        } else {
+          // Cluster Attraction Forces
+          let target = getTargetPosition(this);
+          if (target) {
+            let dx = target.x - this.x;
+            let dy = target.y - this.y;
+            this.vx += dx * 0.008;
+            this.vy += dy * 0.008;
+            if (isGravityActive) this.vy += 0.2;
+          }
+        }
+
+        // Damping / Friction
+        this.vx *= 0.96;
+        this.vy *= 0.96;
+
+        // Speed limit
+        let maxSpeed = 16;
+        let speed = Math.hypot(this.vx, this.vy);
+        if (speed > maxSpeed) {
+          this.vx = (this.vx / speed) * maxSpeed;
+          this.vy = (this.vy / speed) * maxSpeed;
+        }
+
+        // Position update
+        this.x += this.vx;
+        this.y += this.vy;
+
+        // Boundary Wall Collisions
+        const bounce = 0.75;
+        if (this.x - this.r < 0) {
+          this.x = this.r;
+          this.vx = -this.vx * bounce;
+        } else if (this.x + this.r > width) {
+          this.x = width - this.r;
+          this.vx = -this.vx * bounce;
+        }
+
+        if (this.y - this.r < 0) {
+          this.y = this.r;
+          this.vy = -this.vy * bounce;
+        } else if (this.y + this.r > height) {
+          this.y = height - this.r;
+          this.vy = -this.vy * bounce;
+        }
+      }
+
+      draw() {
+        push();
+        translate(this.x, this.y);
+
+        // Highlight Glow on Hover
+        if (this.isHovered || this === draggedCircle) {
+          stroke(255, 255, 255, 220);
+          strokeWeight(3);
+          fill(this.colorStr);
+          drawingContext.shadowBlur = 15;
+          drawingContext.shadowColor = this.colorStr;
+        } else {
+          noStroke();
+          fill(this.colorStr);
+          drawingContext.shadowBlur = 0;
+        }
+
+        circle(0, 0, this.r * 2);
+
+        // Subtly render inner highlight dot
+        fill(255, 255, 255, 60);
+        circle(-this.r * 0.3, -this.r * 0.3, this.r * 0.4);
+
+        pop();
+      }
+    }
+
+    // Helper to determine Season from Json fields
+    function getSeasonFromData(d) {
+      const text = `${d.mois_habitul_de_deroulement || ''} ${d.periode_de_deroulement || ''}`.toLowerCase();
+      if (text.includes('mars') || text.includes('avril') || text.includes('mai') || text.includes('printemps')) return 'Printemps';
+      if (text.includes('juin') || text.includes('juillet') || text.includes('août') || text.includes('aout') || text.includes('été')) return 'Été';
+      if (text.includes('septembre') || text.includes('octobre') || text.includes('novembre') || text.includes('automne')) return 'Automne';
+      if (text.includes('décembre') || text.includes('janvier') || text.includes('février') || text.includes('hiver')) return 'Hiver';
+      
+      // Hash backup allocation for even distribution if unspecified
+      const seasons = ['Printemps', 'Été', 'Automne', 'Hiver'];
+      const val = (d.nom_du_festival || '').length;
+      return seasons[val % 4];
+    }
+
+    // Initialize Circles Array
+    function initCircles() {
+      circles = rawFestivalsData.map((item, idx) => new CircleParticle(item, idx));
+    }
+
+    // Position Targets for Groupings
+    function getTargetPosition(c) {
+      let key = "";
+      if (mode === 'region') key = c.region;
+      else if (mode === 'genre') key = c.genre;
+      else if (mode === 'seasons') key = c.season;
+
+      if (clusterTargets[key]) {
+        return clusterTargets[key];
+      }
+      return { x: width / 2, y: height / 2 };
+    }
+
+    // Calculate Cluster Anchors Grid
+    function computeClusterTargets() {
+      let keys = [];
+      if (mode === 'region') {
+        keys = [...new Set(circles.map(c => c.region))].sort();
+      } else if (mode === 'genre') {
+        keys = [...new Set(circles.map(c => c.genre))].sort();
+      } else if (mode === 'seasons') {
+        keys = ['Printemps', 'Été', 'Automne', 'Hiver'];
+      } else {
+        clusterTargets = {};
+        return;
+      }
+
+      clusterTargets = {};
+      const count = keys.length;
+      
+      if (mode === 'seasons') {
+        // 4 Quadrants for Seasons
+        clusterTargets['Printemps'] = { x: width * 0.25, y: height * 0.3, label: "🌸 Printemps" };
+        clusterTargets['Été'] = { x: width * 0.75, y: height * 0.3, label: "☀️ Été" };
+        clusterTargets['Automne'] = { x: width * 0.25, y: height * 0.75, label: "🍂 Automne" };
+        clusterTargets['Hiver'] = { x: width * 0.75, y: height * 0.75, label: "❄️ Hiver" };
+        return;
+      }
+
+      // Calculate smooth multi-column Grid for Regions / Genres
+      const cols = Math.ceil(Math.sqrt(count * 1.3));
+      const rows = Math.ceil(count / cols);
+      
+      const paddingX = width * 0.12;
+      const paddingY = height * 0.16;
+      const availableW = width - paddingX * 2;
+      const availableH = height - paddingY * 2;
+
+      keys.forEach((k, idx) => {
+        const col = idx % cols;
+        const row = Math.floor(idx / cols);
+        const x = paddingX + (cols > 1 ? (col / (cols - 1)) * availableW : availableW / 2);
+        const y = paddingY + (rows > 1 ? (row / (rows - 1)) * availableH : availableH / 2);
+        clusterTargets[k] = { x, y, label: k };
+      });
+    }
+
+    // p5.js Main Draw Loop
+    function draw() {
+      background(11, 15, 25);
+
+      // Track Mouse Velocity
+      mouseVelocity.x = mouseX - prevMousePos.x;
+      mouseVelocity.y = mouseY - prevMousePos.y;
+      prevMousePos.x = mouseX;
+      prevMousePos.y = mouseY;
+
+      // Draw Sector Boundaries / Labels for Grouped Modes
+      drawClusterBackgrounds();
+
+      // Mouse Hover Detection
+      let hoveredFound = false;
+
+      // Elastic Physics & Collisions Resolution (Multi-pass for stability)
+      for (let pass = 0; pass < 3; pass++) {
+        for (let i = 0; i < circles.length; i++) {
+          for (let j = i + 1; j < circles.length; j++) {
+            resolveCollision(circles[i], circles[j]);
+          }
+        }
+      }
+
+      // Hover and Motion Updates
+      for (let c of circles) {
+        c.isHovered = false;
+        let d = dist(mouseX, mouseY, c.x, c.y);
+        if (!hoveredFound && d <= c.r) {
+          c.isHovered = true;
+          hoveredFound = true;
+          cursor(HAND);
+        }
+        c.update();
+        c.draw();
+      }
+
+      if (!hoveredFound && !draggedCircle) {
+        cursor(ARROW);
+      }
+
+      // Audio Trigger check for Season Universe
+      if (mode === 'seasons') {
+        updateSeasonAudioHover();
+      }
+    }
+
+    // Draw Labels for Categories
+    function drawClusterBackgrounds() {
+      if (mode === 'free') return;
+
+      push();
+      textAlign(CENTER, CENTER);
+      textSize(13);
+      textStyle(BOLD);
+
+      for (let key in clusterTargets) {
+        let t = clusterTargets[key];
+        
+        // Soft backdrop halo
+        noStroke();
+        fill(255, 255, 255, 5);
+        circle(t.x, t.y, 140);
+
+        // Label tag
+        fill(226, 232, 240, 180);
+        let labelStr = t.label.length > 25 ? t.label.substring(0, 22) + '...' : t.label;
+        text(labelStr, t.x, t.y - 75);
+      }
+      pop();
+    }
+
+    // Realistic Circle-Circle Elastic Collision
+    function resolveCollision(c1, c2) {
+      let dx = c2.x - c1.x;
+      let dy = c2.y - c1.y;
+      let distance = Math.hypot(dx, dy);
+      let minDistance = c1.r + c2.r;
+
+      if (distance < minDistance && distance > 0) {
+        // Overlap position resolution (prevent sinking/sticking)
+        let overlap = 0.5 * (minDistance - distance);
+        let nx = dx / distance;
+        let ny = dy / distance;
+
+        if (c1 !== draggedCircle) {
+          c1.x -= nx * overlap;
+          c1.y -= ny * overlap;
+        }
+        if (c2 !== draggedCircle) {
+          c2.x += nx * overlap;
+          c2.y += ny * overlap;
+        }
+
+        // Elastic momentum exchange
+        let kx = c1.vx - c2.vx;
+        let ky = c1.vy - c2.vy;
+        let p = 2 * (nx * kx + ny * ky) / (c1.mass + c2.mass);
+
+        if (c1 !== draggedCircle) {
+          c1.vx -= p * c2.mass * nx;
+          c1.vy -= p * c2.mass * ny;
+        }
+        if (c2 !== draggedCircle) {
+          c2.vx += p * c1.mass * nx;
+          c2.vy += p * c1.mass * ny;
+        }
+      }
+    }
+
+    // Interactive Dragging & Explosions
+    function mousePressed() {
+      // Check for click on circle
+      for (let c of circles) {
+        if (dist(mouseX, mouseY, c.x, c.y) <= c.r) {
+          draggedCircle = c;
+          return;
+        }
+      }
+    }
+
+    function mouseReleased() {
+      if (draggedCircle) {
+        draggedCircle = null;
+      }
+    }
+
+    function mouseClicked() {
+      // If clicked on circle (and not dragging heavily), open modal details
+      for (let c of circles) {
+        if (dist(mouseX, mouseY, c.x, c.y) <= c.r) {
+          openModal(c.data, c.colorStr);
+          break;
+        }
+      }
+    }
+
+    // Responsive Canvas Resizing
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      computeClusterTargets();
+    }
+
+    // Mode Switcher Controller
+    function setMode(newMode) {
+      mode = newMode;
+      
+      // Update Button Styles
+      document.querySelectorAll('.btn-action').forEach(b => b.classList.remove('btn-active'));
+      document.getElementById(`btn-${newMode}`).classList.add('btn-active');
+
+      const seasonBadge = document.getElementById('season-audio-badge');
+      if (mode === 'seasons') {
+        seasonBadge.classList.remove('hidden');
+        initAudioEngine();
+      } else {
+        seasonBadge.classList.add('hidden');
+        stopAudioEngine();
+      }
+
+      computeClusterTargets();
+    }
+
+    // Gravity Toggle
+    function toggleGravity() {
+      isGravityActive = !isGravityActive;
+      const btn = document.getElementById('btn-gravity');
+      const label = document.getElementById('gravity-label');
+      
+      if (isGravityActive) {
+        btn.classList.add('btn-active');
+        label.innerText = "Gravité: ON";
+      } else {
+        btn.classList.remove('btn-active');
+        label.innerText = "Gravité: OFF";
+      }
+    }
+
+    // Explosion Radial Impulse Force
+    function explodeCircles() {
+      circles.forEach(c => {
+        let angle = random(TWO_PI);
+        let force = random(18, 35);
+        c.vx = Math.cos(angle) * force;
+        c.vy = Math.sin(angle) * force;
+      });
+    }
+
+    // Modal Details Popup Management
+    function openModal(d, color) {
+      const modal = document.getElementById('modal');
+      const content = document.getElementById('modal-content');
+      
+      document.getElementById('modal-title').innerText = d.nom_du_festival || "Festival de Cinéma";
+      document.getElementById('modal-commune-region').innerText = `${d.commune_principal_de_deroulement || d.commune || 'Lieu non spécifié'} • ${d.region || 'France'}`;
+      document.getElementById('modal-year').innerText = d.annee_creation_du_festival || "Inconnue";
+      document.getElementById('modal-season').innerText = getSeasonFromData(d);
+      document.getElementById('modal-genre').innerText = d.genres_texte_brut || "Cinéma";
+      document.getElementById('modal-dept').innerText = d.departement || "Non renseigné";
+      
+      const badge = document.getElementById('modal-color-badge');
+      badge.style.backgroundColor = color;
+
+      const linkBtn = document.getElementById('modal-link');
+      if (d.site_web) {
+        let url = d.site_web.startsWith('http') ? d.site_web : `https://${d.site_web}`;
+        linkBtn.href = url;
+        linkBtn.classList.remove('hidden');
+      } else {
+        linkBtn.classList.add('hidden');
+      }
+
+      modal.classList.remove('opacity-0', 'pointer-events-none');
+      content.classList.remove('scale-95');
+      content.classList.add('scale-100');
+    }
+
+    function closeModal() {
+      const modal = document.getElementById('modal');
+      const content = document.getElementById('modal-content');
+      modal.classList.add('opacity-0', 'pointer-events-none');
+      content.classList.remove('scale-100');
+      content.classList.add('scale-95');
+    }
+
+    // Web Audio Ambient Synthesizer Implementation
+    function initAudioEngine() {
+      if (!audioCtx) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContext();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+
+      if (!synthOsc) {
+        synthOsc = audioCtx.createOscillator();
+        synthGain = audioCtx.createGain();
+        
+        synthOsc.type = 'sine';
+        synthOsc.frequency.setValueAtTime(220, audioCtx.currentTime);
+        
+        synthGain.gain.setValueAtTime(0, audioCtx.currentTime);
+        
+        synthOsc.connect(synthGain);
+        synthGain.connect(audioCtx.destination);
+        synthOsc.start();
+      }
+    }
+
+    function stopAudioEngine() {
+      if (synthGain && audioCtx) {
+        synthGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
+      }
+      currentSeasonNote = "";
+      document.getElementById('active-season-name').innerText = "Saison: --";
+    }
+
+    function updateSeasonAudioHover() {
+      let hoveredSeason = null;
+      if (mouseX < width / 2 && mouseY < height / 2) hoveredSeason = 'Printemps';
+      else if (mouseX >= width / 2 && mouseY < height / 2) hoveredSeason = 'Été';
+      else if (mouseX < width / 2 && mouseY >= height / 2) hoveredSeason = 'Automne';
+      else if (mouseX >= width / 2 && mouseY >= height / 2) hoveredSeason = 'Hiver';
+
+      if (hoveredSeason && hoveredSeason !== currentSeasonNote) {
+        currentSeasonNote = hoveredSeason;
+        document.getElementById('active-season-name').innerText = `Saison: ${hoveredSeason}`;
+
+        if (audioCtx && synthOsc && synthGain) {
+          let notes = SEASON_FREQS[hoveredSeason];
+          let freq = notes[Math.floor(Math.random() * notes.length)];
+          
+          synthOsc.frequency.setTargetAtTime(freq, audioCtx.currentTime, 0.2);
+          synthGain.gain.setTargetAtTime(0.08, audioCtx.currentTime, 0.2);
+        }
+      }
+    }
+  </script>
+</body>
+</html>
