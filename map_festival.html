@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Carte Interactive des Festivals de Cinéma</title>
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- MarkerCluster CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg-dark: #080a0f;
+      --card-bg: rgba(15, 20, 32, 0.85);
+      --neon-cyan: #00f3ff;
+      --neon-magenta: #ff0055;
+      --neon-gold: #ffcc00;
+      --text-main: #f0f4f8;
+      --text-muted: #8a99ad;
+      --border-glow: rgba(0, 243, 255, 0.3);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    /* Carte Leaflet */
+    #map {
+      height: 100vh;
+      width: 100vw;
+      background: #05070a;
+      z-index: 1;
+    }
+
+    /* Overlay sombre pour la thématique Cinémathèque */
+    .map-overlay-vignette {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none;
+      box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.8);
+      z-index: 2;
+    }
+
+    /* En-tête / Titre Cinéma */
+    .header-panel {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 10;
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      padding: 16px 24px;
+      border-radius: 12px;
+      border: 1px solid var(--border-glow);
+      box-shadow: 0 0 25px rgba(0, 243, 255, 0.15);
+      max-width: 380px;
+    }
+
+    .header-panel h1 {
+      font-family: 'Cinzel', serif;
+      font-size: 1.4rem;
+      letter-spacing: 2px;
+      color: #fff;
+      text-transform: uppercase;
+      text-shadow: 0 0 10px rgba(0, 243, 255, 0.6);
+      margin-bottom: 4px;
+    }
+
+    .header-panel p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    /* Indicateur de Zoom / Échelle */
+    .scale-indicator {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      background: rgba(0, 243, 255, 0.1);
+      color: var(--neon-cyan);
+      border: 1px solid rgba(0, 243, 255, 0.4);
+    }
+
+    /* SVG Overlay pour les Lignes de Connexion par Genre */
+    #network-svg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    .network-line {
+      stroke-linecap: round;
+      opacity: 0.75;
+      filter: drop-shadow(0 0 6px currentColor);
+      animation: pulse-line 1.5s infinite alternate ease-in-out;
+    }
+
+    @keyframes pulse-line {
+      from { opacity: 0.4; stroke-width: 1.5px; }
+      to { opacity: 0.9; stroke-width: 3px; }
+    }
+
+    /* Fiche Détails (Modal / Sidebar) */
+    .detail-card {
+      position: absolute;
+      bottom: 30px;
+      right: 30px;
+      z-index: 10;
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      width: 360px;
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 24px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), 0 0 20px rgba(0, 243, 255, 0.2);
+      transform: translateY(120%);
+      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .detail-card.active {
+      transform: translateY(0);
+    }
+
+    .detail-card .close-btn {
+      position: absolute;
+      top: 16px; right: 16px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.2rem;
+      cursor: pointer;
+    }
+
+    .detail-card .close-btn:hover { color: #fff; }
+
+    .detail-title {
+      font-family: 'Cinzel', serif;
+      font-size: 1.25rem;
+      color: #fff;
+      margin-bottom: 8px;
+      line-height: 1.3;
+    }
+
+    .detail-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      margin-right: 6px;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+    }
+
+    .detail-info {
+      font-size: 0.88rem;
+      color: var(--text-main);
+      line-height: 1.6;
+    }
+
+    .detail-info strong {
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    .genres-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .genre-tag {
+      font-size: 0.75rem;
+      padding: 4px 8px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    /* Style des Marqueurs et Clusters */
+    .custom-marker {
+      border-radius: 50%;
+      transition: transform 0.2s ease;
+    }
+
+    .custom-marker:hover {
+      transform: scale(1.4);
+      z-index: 1000 !important;
+    }
+
+    .marker-cluster-custom {
+      background: rgba(15, 20, 32, 0.85);
+      border: 2px solid var(--neon-cyan);
+      box-shadow: 0 0 15px var(--neon-cyan);
+      color: #fff;
+      font-family: 'Outfit', sans-serif;
+      font-weight: 700;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+
+    .marker-cluster-custom span {
+      font-size: 0.9rem;
+      text-shadow: 0 0 5px #000;
+    }
+
+    /* Contrôles de Zoom Leaflet Custom */
+    .leaflet-control-zoom {
+      border: none !important;
+      box-shadow: 0 0 15px rgba(0,0,0,0.5) !important;
+    }
+    
+    .leaflet-control-zoom a {
+      background-color: var(--card-bg) !important;
+      color: var(--text-main) !important;
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--border-glow) !important;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header-panel">
+    <h1>CinéMap Néon</h1>
+    <p>Répartition spatiale & réseau des festivals de cinéma</p>
+    <div id="scale-label" class="scale-indicator">Échelle : Régions</div>
+  </div>
+
+  <div class="map-overlay-vignette"></div>
+  <div id="map"></div>
+  <svg id="network-svg"></svg>
+
+  <!-- Card Détails Festival -->
+  <div id="detail-card" class="detail-card">
+    <button class="close-btn" onclick="closeDetailCard()">&times;</button>
+    <div id="detail-badge" class="detail-badge"></div>
+    <h2 id="detail-title" class="detail-title"></h2>
+    <div class="detail-info">
+      <p><strong>Localisation :</strong> <span id="detail-location"></span></p>
+      <p><strong>Création :</strong> <span id="detail-year"></span></p>
+
+      <div style="margin-top: 10px;">
+        <strong>Genres associés :</strong>
+        <div id="detail-genres" class="genres-list"></div>
+      </div>
+      
+      <p style="margin-top: 14px;" id="detail-site-wrapper">
+        <a id="detail-site" href="#" target="_blank" style="color: var(--neon-cyan); text-decoration: none; font-weight: 600;">Accéder au site officiel &rarr;</a>
+      </p>
+    </div>
+  </div>
+
+  <!-- Scripts Libs -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+
+  <script>
+    const DATA_URL = "https://raw.githubusercontent.com/Jean-Deluxe/s01e01_graphique_simple/refs/heads/main/festivals_cinema_684.json";
+
+    let map;
+    let festivalsData = [];
+    let markerClusterGroup;
+    let festivalMarkers = new Map();
+    let genreColorMap = new Map();
+    let hoveredFestival = null;
+
+    // Palette des genres
+    const GENRE_PALETTE = [
+      '#ff0055', '#00f3ff', '#ffcc00', '#00ff66', '#9900ff', 
+      '#ff6600', '#ff00aa', '#00ccff', '#ccff00', '#ff3366'
+    ];
+
+    // Générateur de couleur unique par festival (String Hash HSL)
+    function getFestivalColor(name) {
+      let hash = 0;
+      for (let i = 0; i < name.length; i++) {
+        hash = name.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      const h = Math.abs(hash) % 360;
+      return `hsl(${h}, 90%, 60%)`;
+    }
+
+    // Récupérer la couleur associée à un genre
+    function getGenreColor(genre) {
+      const g = genre.trim().toLowerCase();
+      if (!genreColorMap.has(g)) {
+        const color = GENRE_PALETTE[genreColorMap.size % GENRE_PALETTE.length];
+        genreColorMap.set(g, color);
+      }
+      return genreColorMap.get(g);
+    }
+
+    // Initialisation de la carte
+    function initMap() {
+      map = L.map('map', {
+        center: [46.603354, 1.888334], // Centre France
+        zoom: 6,
+        zoomControl: true
+      });
+
+      // Fond de carte sombre CartoDB Dark Matter
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap &copy; CARTO',
+        subdomains: 'abcd',
+        maxZoom: 19
+      }).addTo(map);
+
+      // Gestionnaire de Clusters personnalisé
+      markerClusterGroup = L.markerclusterGroup({
+        chunkedLoading: true,
+        maxClusterRadius: (zoom) => {
+          if (zoom <= 6) return 80;  // Niveau Région
+          if (zoom <= 9) return 50;  // Niveau Département
+          return 30;                 // Niveau Commune
+        },
+        iconCreateFunction: (cluster) => {
+          const count = cluster.getChildCount();
+          let size = 36 + Math.min(count / 5, 24);
+          return L.divIcon({
+            html: `<div class="marker-cluster-custom" style="width:${size}px; height:${size}px;"><span>${count}</span></div>`,
+            className: 'custom-cluster-icon',
+            iconSize: [size, size]
+          });
+        }
+      });
+
+      map.addLayer(markerClusterGroup);
+
+      // Suivi de l'échelle pour l'indicateur d'interface
+      map.on('zoomend', updateScaleIndicator);
+      map.on('move', drawNetworkLines);
+      window.addEventListener('resize', drawNetworkLines);
+
+      loadData();
+    }
+
+    // Mise à jour de l'étiquette d'échelle
+    function updateScaleIndicator() {
+      const zoom = map.getZoom();
+      const label = document.getElementById('scale-label');
+      if (zoom <= 6) {
+        label.innerText = "Échelle : Régions";
+      } else if (zoom <= 9) {
+        label.innerText = "Échelle : Départements";
+      } else {
+        label.innerText = "Échelle : Communes / Établissements";
+      }
+      drawNetworkLines();
+    }
+
+    // Chargement et traitement du JSON
+    async function loadData() {
+      try {
+        const res = await fetch(DATA_URL);
+        const rawData = await res.json();
+
+        // Filtrer les données valides
+        festivalsData = rawData.filter(d => {
+          const lat = parseFloat(d.geocodage_latitude || d.latitude || (d.yt_geocoding && d.yt_geocoding.lat));
+          const lon = parseFloat(d.geocodage_longitude || d.longitude || (d.yt_geocoding && d.yt_geocoding.lon));
+          return !isNaN(lat) && !isNaN(lon);
+        }).map((d, index) => {
+          const lat = parseFloat(d.geocodage_latitude || d.latitude || (d.yt_geocoding && d.yt_geocoding.lat));
+          const lon = parseFloat(d.geocodage_longitude || d.longitude || (d.yt_geocoding && d.yt_geocoding.lon));
+          
+          const genres = d.genres_texte_brut 
+            ? d.genres_texte_brut.split(',').map(g => g.trim()).filter(g => g.length > 0)
+            : ['Cinéma'];
+
+          return {
+            id: index,
+            nom: d.nom_du_festival || d.nom || "Festival de Cinéma",
+            region: d.region || d.region_principale || "Non spécifiée",
+            departement: d.departement || "Non spécifié",
+            commune: d.commune || d.commune_principale || "Non spécifiée",
+            annee: d.annee_de_creation_du_festival || d.annee_creation || "Inconnue",
+            site: d.site_internet || d.url || null,
+            genres: genres,
+            lat: lat,
+            lon: lon,
+            color: getFestivalColor(d.nom_du_festival || `fest-${index}`)
+          };
+        });
+
+        renderMarkers();
+      } catch (err) {
+        console.error("Erreur au chargement des festivals:", err);
+      }
+    }
+
+    // Rendu des Marqueurs sur la Carte
+    function renderMarkers() {
+      festivalMarkers.clear();
+      markerClusterGroup.clearLayers();
+
+      festivalsData.forEach(fest => {
+        const customIcon = L.divIcon({
+          className: 'custom-marker-wrapper',
+          html: `<div class="custom-marker" style="
+            background-color: ${fest.color};
+            width: 14px;
+            height: 14px;
+            border: 2px solid #fff;
+            box-shadow: 0 0 10px ${fest.color};
+          "></div>`,
+          iconSize: [14, 14],
+          iconAnchor: [7, 7]
+        });
+
+        const marker = L.marker([fest.lat, fest.lon], { icon: customIcon });
+        marker.festData = fest;
+
+        // Interaction au survol (Réseau par genre)
+        marker.on('mouseover', () => {
+          hoveredFestival = fest;
+          drawNetworkLines();
+        });
+
+        marker.on('mouseout', () => {
+          hoveredFestival = null;
+          clearNetworkLines();
+        });
+
+        // Clic : Afficher détails
+        marker.on('click', (e) => {
+          showDetailCard(fest);
+          L.DomEvent.stopPropagation(e);
+        });
+
+        festivalMarkers.set(fest.id, marker);
+        markerClusterGroup.addLayer(marker);
+      });
+    }
+
+    // Dessin des lignes de connexions réseau SVG (par genre partagé)
+    function drawNetworkLines() {
+      const svg = d3.select("#network-svg");
+      svg.selectAll("*").remove();
+
+      if (!hoveredFestival) return;
+
+      const sourcePoint = map.latLngToContainerPoint([hoveredFestival.lat, hoveredFestival.lon]);
+      const linesToDraw = [];
+
+      festivalsData.forEach(otherFest => {
+        if (otherFest.id === hoveredFestival.id) return;
+
+        // Trouver les genres partagés
+        const sharedGenres = hoveredFestival.genres.filter(g => 
+          otherFest.genres.some(og => og.toLowerCase() === g.toLowerCase())
+        );
+
+        if (sharedGenres.length > 0) {
+          const targetPoint = map.latLngToContainerPoint([otherFest.lat, otherFest.lon]);
+          
+          sharedGenres.forEach(genre => {
+            linesToDraw.push({
+              x1: sourcePoint.x,
+              y1: sourcePoint.y,
+              x2: targetPoint.x,
+              y2: targetPoint.y,
+              color: getGenreColor(genre),
+              genre: genre
+            });
+          });
+        }
+      });
+
+      // Rendu SVG D3
+      svg.selectAll("line")
+        .data(linesToDraw)
+        .enter()
+        .append("line")
+        .attr("class", "network-line")
+        .attr("x1", d => d.x1)
+        .attr("y1", d => d.y1)
+        .attr("x2", d => d.x2)
+        .attr("y2", d => d.y2)
+        .attr("stroke", d => d.color);
+    }
+
+    function clearNetworkLines() {
+      d3.select("#network-svg").selectAll("*").remove();
+    }
+
+    // Affichage de la Fiche Détail
+    function showDetailCard(fest) {
+      const card = document.getElementById('detail-card');
+      
+      document.getElementById('detail-title').innerText = fest.nom;
+      document.getElementById('detail-location').innerText = `${fest.commune} (${fest.departement}), ${fest.region}`;
+      document.getElementById('detail-year').innerText = fest.annee;
+      
+      const badge = document.getElementById('detail-badge');
+      badge.innerText = fest.region;
+      badge.style.backgroundColor = fest.color;
+      badge.style.color = '#000';
+
+      const genresContainer = document.getElementById('detail-genres');
+      genresContainer.innerHTML = '';
+      fest.genres.forEach(g => {
+        const tag = document.createElement('span');
+        tag.className = 'genre-tag';
+        tag.innerText = g;
+        tag.style.borderColor = getGenreColor(g);
+        genresContainer.appendChild(tag);
+      });
+
+      const siteWrapper = document.getElementById('detail-site-wrapper');
+      const siteLink = document.getElementById('detail-site');
+      if (fest.site) {
+        siteLink.href = fest.site.startsWith('http') ? fest.site : `http://${fest.site}`;
+        siteWrapper.style.display = 'block';
+      } else {
+        siteWrapper.style.display = 'none';
+      }
+
+      card.classList.add('active');
+    }
+
+    function closeDetailCard() {
+      document.getElementById('detail-card').classList.remove('active');
+    }
+
+    // Démarrage
+    window.onload = initMap;
+  </script>
+</body>
+</html>
