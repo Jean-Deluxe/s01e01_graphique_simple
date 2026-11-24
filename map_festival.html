@@ -1,561 +1,826 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" class="dark">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Carte Interactive des Festivals de Cinéma</title>
-  
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <!-- MarkerCluster CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
-  <!-- Google Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Festivals de Cinéma en France - CyberMap Néon Noir</title>
 
-  <style>
-    :root {
-      --bg-dark: #080a0f;
-      --card-bg: rgba(15, 20, 32, 0.85);
-      --neon-cyan: #00f3ff;
-      --neon-magenta: #ff0055;
-      --neon-gold: #ffcc00;
-      --text-main: #f0f4f8;
-      --text-muted: #8a99ad;
-      --border-glow: rgba(0, 243, 255, 0.3);
-    }
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Space Grotesk', 'sans-serif'],
+                    },
+                    colors: {
+                        cyber: {
+                            bg: '#06060c',
+                            panel: 'rgba(13, 13, 24, 0.75)',
+                            border: 'rgba(0, 243, 255, 0.2)',
+                            cyan: '#00f3ff',
+                            magenta: '#ff007f',
+                            green: '#00ff88',
+                            yellow: '#ffcc00',
+                            purple: '#ab47bc'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
 
-    body {
-      font-family: 'Outfit', sans-serif;
-      background-color: var(--bg-dark);
-      color: var(--text-main);
-      overflow: hidden;
-      height: 100vh;
-      width: 100vw;
-    }
-
-    /* Carte Leaflet */
-    #map {
-      height: 100vh;
-      width: 100vw;
-      background: #05070a;
-      z-index: 1;
-    }
-
-    /* Overlay sombre pour la thématique Cinémathèque */
-    .map-overlay-vignette {
-      position: absolute;
-      top: 0; left: 0; width: 100%; height: 100%;
-      pointer-events: none;
-      box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.8);
-      z-index: 2;
-    }
-
-    /* En-tête / Titre Cinéma */
-    .header-panel {
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      z-index: 10;
-      background: var(--card-bg);
-      backdrop-filter: blur(12px);
-      padding: 16px 24px;
-      border-radius: 12px;
-      border: 1px solid var(--border-glow);
-      box-shadow: 0 0 25px rgba(0, 243, 255, 0.15);
-      max-width: 380px;
-    }
-
-    .header-panel h1 {
-      font-family: 'Cinzel', serif;
-      font-size: 1.4rem;
-      letter-spacing: 2px;
-      color: #fff;
-      text-transform: uppercase;
-      text-shadow: 0 0 10px rgba(0, 243, 255, 0.6);
-      margin-bottom: 4px;
-    }
-
-    .header-panel p {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-    }
-
-    /* Indicateur de Zoom / Échelle */
-    .scale-indicator {
-      display: inline-block;
-      margin-top: 8px;
-      padding: 4px 10px;
-      border-radius: 20px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      background: rgba(0, 243, 255, 0.1);
-      color: var(--neon-cyan);
-      border: 1px solid rgba(0, 243, 255, 0.4);
-    }
-
-    /* SVG Overlay pour les Lignes de Connexion par Genre */
-    #network-svg {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      z-index: 5;
-    }
-
-    .network-line {
-      stroke-linecap: round;
-      opacity: 0.75;
-      filter: drop-shadow(0 0 6px currentColor);
-      animation: pulse-line 1.5s infinite alternate ease-in-out;
-    }
-
-    @keyframes pulse-line {
-      from { opacity: 0.4; stroke-width: 1.5px; }
-      to { opacity: 0.9; stroke-width: 3px; }
-    }
-
-    /* Fiche Détails (Modal / Sidebar) */
-    .detail-card {
-      position: absolute;
-      bottom: 30px;
-      right: 30px;
-      z-index: 10;
-      background: var(--card-bg);
-      backdrop-filter: blur(16px);
-      width: 360px;
-      border-radius: 16px;
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      padding: 24px;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), 0 0 20px rgba(0, 243, 255, 0.2);
-      transform: translateY(120%);
-      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-
-    .detail-card.active {
-      transform: translateY(0);
-    }
-
-    .detail-card .close-btn {
-      position: absolute;
-      top: 16px; right: 16px;
-      background: transparent;
-      border: none;
-      color: var(--text-muted);
-      font-size: 1.2rem;
-      cursor: pointer;
-    }
-
-    .detail-card .close-btn:hover { color: #fff; }
-
-    .detail-title {
-      font-family: 'Cinzel', serif;
-      font-size: 1.25rem;
-      color: #fff;
-      margin-bottom: 8px;
-      line-height: 1.3;
-    }
-
-    .detail-badge {
-      display: inline-block;
-      padding: 3px 8px;
-      border-radius: 4px;
-      font-size: 0.7rem;
-      font-weight: 700;
-      margin-right: 6px;
-      margin-bottom: 12px;
-      text-transform: uppercase;
-    }
-
-    .detail-info {
-      font-size: 0.88rem;
-      color: var(--text-main);
-      line-height: 1.6;
-    }
-
-    .detail-info strong {
-      color: var(--text-muted);
-      font-weight: 400;
-    }
-
-    .genres-list {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-top: 10px;
-    }
-
-    .genre-tag {
-      font-size: 0.75rem;
-      padding: 4px 8px;
-      border-radius: 6px;
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-    }
-
-    /* Style des Marqueurs et Clusters */
-    .custom-marker {
-      border-radius: 50%;
-      transition: transform 0.2s ease;
-    }
-
-    .custom-marker:hover {
-      transform: scale(1.4);
-      z-index: 1000 !important;
-    }
-
-    .marker-cluster-custom {
-      background: rgba(15, 20, 32, 0.85);
-      border: 2px solid var(--neon-cyan);
-      box-shadow: 0 0 15px var(--neon-cyan);
-      color: #fff;
-      font-family: 'Outfit', sans-serif;
-      font-weight: 700;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-    }
-
-    .marker-cluster-custom span {
-      font-size: 0.9rem;
-      text-shadow: 0 0 5px #000;
-    }
-
-    /* Contrôles de Zoom Leaflet Custom */
-    .leaflet-control-zoom {
-      border: none !important;
-      box-shadow: 0 0 15px rgba(0,0,0,0.5) !important;
-    }
+    <!-- Leaflet & Leaflet.markercluster CSS/JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
-    .leaflet-control-zoom a {
-      background-color: var(--card-bg) !important;
-      color: var(--text-main) !important;
-      backdrop-filter: blur(8px);
-      border: 1px solid var(--border-glow) !important;
-    }
-  </style>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+    <style>
+        /* Modern Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #080811;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 243, 255, 0.3);
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 243, 255, 0.6);
+        }
+
+        /* Neon Glow Effects */
+        .neon-border-cyan {
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.25), inset 0 0 10px rgba(0, 243, 255, 0.1);
+            border: 1px solid rgba(0, 243, 255, 0.4);
+        }
+        .neon-border-magenta {
+            box-shadow: 0 0 15px rgba(255, 0, 127, 0.25), inset 0 0 10px rgba(255, 0, 127, 0.1);
+            border: 1px solid rgba(255, 0, 127, 0.4);
+        }
+        .neon-text-cyan {
+            text-shadow: 0 0 8px rgba(0, 243, 255, 0.6);
+        }
+        .neon-text-magenta {
+            text-shadow: 0 0 8px rgba(255, 0, 127, 0.6);
+        }
+        .glass-panel {
+            background: rgba(10, 10, 20, 0.78);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        /* Custom Cluster Styles */
+        .cyber-cluster {
+            background: rgba(6, 6, 12, 0.85);
+            border: 2px solid #00f3ff;
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.6), inset 0 0 8px rgba(0, 243, 255, 0.4);
+            color: #ffffff;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 700;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+        .cyber-cluster:hover {
+            transform: scale(1.15);
+            box-shadow: 0 0 25px rgba(255, 0, 127, 0.8), inset 0 0 12px rgba(255, 0, 127, 0.6);
+            border-color: #ff007f;
+        }
+        .cyber-cluster span {
+            text-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
+        }
+
+        /* Pulsing animation for markers */
+        @keyframes pulse-glow {
+            0% { box-shadow: 0 0 0 0 rgba(0, 243, 255, 0.7); }
+            70% { box-shadow: 0 0 0 12px rgba(0, 243, 255, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 243, 255, 0); }
+        }
+        .festival-marker-active {
+            animation: pulse-glow 1.8s infinite;
+        }
+
+        /* Leaflet Controls Styling Override */
+        .leaflet-control-zoom {
+            border: none !important;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5) !important;
+        }
+        .leaflet-control-zoom-in, .leaflet-control-zoom-out {
+            background-color: rgba(10, 10, 20, 0.85) !important;
+            color: #00f3ff !important;
+            border: 1px solid rgba(0, 243, 255, 0.3) !important;
+            backdrop-filter: blur(8px);
+        }
+        .leaflet-control-zoom-in:hover, .leaflet-control-zoom-out:hover {
+            background-color: #00f3ff !important;
+            color: #06060c !important;
+        }
+        .leaflet-container {
+            background-color: #06060c !important;
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
 </head>
-<body>
+<body class="bg-[#06060c] text-slate-100 font-sans overflow-hidden h-screen w-screen flex flex-col">
 
-  <div class="header-panel">
-    <h1>CinéMap Néon</h1>
-    <p>Répartition spatiale & réseau des festivals de cinéma</p>
-    <div id="scale-label" class="scale-indicator">Échelle : Régions</div>
-  </div>
+    <!-- HEADER / NAVIGATION BAR -->
+    <header class="h-16 border-b border-cyan-950/60 glass-panel z-30 px-4 md:px-6 flex items-center justify-between shrink-0">
+        <div class="flex items-center space-x-3">
+            <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-cyan-500 to-pink-600 p-[1px] shadow-lg shadow-cyan-500/20">
+                <div class="w-full h-full bg-[#06060c] rounded-[7px] flex items-center justify-center">
+                    <i class="fa-solid fa-film text-cyan-400 text-lg"></i>
+                </div>
+            </div>
+            <div>
+                <h1 class="font-display font-bold text-lg md:text-xl tracking-wide bg-gradient-to-r from-cyan-400 via-pink-400 to-yellow-300 bg-clip-text text-transparent">
+                    CYBER CINÉMA <span class="text-xs px-2 py-0.5 rounded border border-cyan-500/30 text-cyan-300 font-normal">FRANCE</span>
+                </h1>
+                <p class="text-[11px] text-slate-400 hidden sm:block">Carte interactive des festivals de cinéma & réseau de genres</p>
+            </div>
+        </div>
 
-  <div class="map-overlay-vignette"></div>
-  <div id="map"></div>
-  <svg id="network-svg"></svg>
+        <!-- Dynamic Zoom Level & Stats -->
+        <div class="flex items-center space-x-3">
+            <div id="zoom-indicator" class="hidden md:flex items-center space-x-2 px-3 py-1.5 rounded-full bg-slate-900/80 border border-slate-800 text-xs font-display">
+                <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                <span class="text-slate-400">Échelle :</span>
+                <span id="zoom-level-text" class="text-cyan-300 font-medium">Vue Nationale</span>
+            </div>
+            
+            <div class="px-3 py-1.5 rounded-full bg-cyan-950/40 border border-cyan-500/30 text-xs font-display flex items-center space-x-2">
+                <i class="fa-solid fa-clapperboard text-pink-400"></i>
+                <span id="stat-count" class="text-cyan-400 font-bold">0</span>
+                <span class="text-slate-400 hidden sm:inline">festivals</span>
+            </div>
+        </div>
+    </header>
 
-  <!-- Card Détails Festival -->
-  <div id="detail-card" class="detail-card">
-    <button class="close-btn" onclick="closeDetailCard()">&times;</button>
-    <div id="detail-badge" class="detail-badge"></div>
-    <h2 id="detail-title" class="detail-title"></h2>
-    <div class="detail-info">
-      <p><strong>Localisation :</strong> <span id="detail-location"></span></p>
-      <p><strong>Création :</strong> <span id="detail-year"></span></p>
+    <!-- MAIN CONTENT LAYOUT -->
+    <div class="relative flex-1 w-full h-full overflow-hidden flex">
+        
+        <!-- LEFT CONTROL PANEL (FILTERS & CONTROLS) -->
+        <aside id="left-panel" class="absolute top-4 left-4 z-20 w-[calc(100%-2rem)] sm:w-80 md:w-96 max-h-[calc(100%-2rem)] flex flex-col space-y-3 pointer-events-auto transition-all duration-300">
+            
+            <!-- Search & Filter Card -->
+            <div class="glass-panel rounded-xl p-4 space-y-3 border-cyan-500/20 shadow-xl">
+                <!-- Search Input -->
+                <div class="relative">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                    <input type="text" id="search-input" placeholder="Rechercher festival, ville, région..." 
+                        class="w-full pl-9 pr-8 py-2 bg-slate-900/90 border border-slate-700/80 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition" />
+                    <button id="clear-search" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
 
-      <div style="margin-top: 10px;">
-        <strong>Genres associés :</strong>
-        <div id="detail-genres" class="genres-list"></div>
-      </div>
-      
-      <p style="margin-top: 14px;" id="detail-site-wrapper">
-        <a id="detail-site" href="#" target="_blank" style="color: var(--neon-cyan); text-decoration: none; font-weight: 600;">Accéder au site officiel &rarr;</a>
-      </p>
+                <!-- Genre Selector -->
+                <div class="space-y-1">
+                    <label class="text-[11px] font-display font-medium text-cyan-300 uppercase tracking-wider flex justify-between">
+                        <span>Filtre global par Genre</span>
+                        <span id="genre-count" class="text-slate-400">Tous</span>
+                    </label>
+                    <div class="relative">
+                        <select id="genre-select" class="w-full px-3 py-2 bg-slate-900/90 border border-slate-700/80 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-cyan-400 transition appearance-none cursor-pointer">
+                            <option value="">Tous les genres (complet)</option>
+                        </select>
+                        <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
+                    </div>
+                </div>
+
+                <!-- Max Connection Limit Controls -->
+                <div class="space-y-1 pt-1 border-t border-slate-800">
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="text-slate-300 font-display font-medium">Lignes de réseau max :</span>
+                        <span id="connection-limit-val" class="text-pink-400 font-bold font-mono">20 proches</span>
+                    </div>
+                    <div class="grid grid-cols-5 gap-1 pt-1">
+                        <button data-limit="5" class="limit-btn px-2 py-1 bg-slate-900 border border-slate-700 text-xs rounded text-slate-300 hover:border-cyan-400 transition">5</button>
+                        <button data-limit="10" class="limit-btn px-2 py-1 bg-slate-900 border border-slate-700 text-xs rounded text-slate-300 hover:border-cyan-400 transition">10</button>
+                        <button data-limit="20" class="limit-btn active px-2 py-1 bg-cyan-950 border border-cyan-400 text-xs rounded text-cyan-300 font-bold transition">20</button>
+                        <button data-limit="50" class="limit-btn px-2 py-1 bg-slate-900 border border-slate-700 text-xs rounded text-slate-300 hover:border-cyan-400 transition">50</button>
+                        <button data-limit="999" class="limit-btn px-2 py-1 bg-slate-900 border border-slate-700 text-xs rounded text-slate-300 hover:border-cyan-400 transition">Tout</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Festival List (Scrollable) -->
+            <div class="glass-panel rounded-xl p-3 flex-1 overflow-hidden flex flex-col min-h-0 border-cyan-500/10 hidden sm:flex">
+                <div class="text-[11px] font-display font-medium text-slate-400 uppercase tracking-wider pb-2 border-b border-slate-800 flex justify-between items-center">
+                    <span>Résultats visibles</span>
+                    <span id="visible-list-count" class="text-xs text-cyan-400 font-mono">0</span>
+                </div>
+                <div id="festival-list" class="overflow-y-auto flex-1 divide-y divide-slate-800/60 pr-1 space-y-1 mt-1">
+                    <!-- Items injected dynamically -->
+                </div>
+            </div>
+        </aside>
+
+        <!-- MAP CANVAS CONTAINER -->
+        <div id="map" class="w-full h-full z-10"></div>
+
+        <!-- RIGHT SIDEBAR PANEL: FESTIVAL DETAILS & ACTIVE GENRE NETWORK -->
+        <aside id="right-panel" class="absolute top-4 right-4 z-20 w-[calc(100%-2rem)] sm:w-96 max-h-[calc(100%-2rem)] glass-panel rounded-xl p-5 border-pink-500/30 shadow-2xl transition-all duration-300 translate-x-[120%] pointer-events-auto flex flex-col overflow-y-auto">
+            
+            <!-- Panel Header -->
+            <div class="flex items-start justify-between border-b border-slate-800 pb-3">
+                <div class="flex items-center space-x-2">
+                    <span id="detail-color-dot" class="w-3 h-3 rounded-full bg-cyan-400 inline-block shadow-[0_0_8px_#00f3ff]"></span>
+                    <span class="text-xs font-display uppercase tracking-wider text-slate-400">Fiche Festival</span>
+                </div>
+                <button id="close-panel-btn" class="w-7 h-7 rounded-full bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition">
+                    <i class="fa-solid fa-xmark text-sm"></i>
+                </button>
+            </div>
+
+            <!-- Festival Info Section -->
+            <div class="mt-4 space-y-4">
+                <div>
+                    <h2 id="detail-title" class="font-display font-bold text-xl text-white leading-tight">Nom du Festival</h2>
+                    <p id="detail-commune" class="text-sm text-cyan-400 font-medium mt-1"><i class="fa-solid fa-location-dot mr-1"></i> Ville, Département</p>
+                </div>
+
+                <!-- Metadata Grid -->
+                <div class="grid grid-cols-2 gap-2 text-xs">
+                    <div class="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800/80">
+                        <span class="text-slate-400 block mb-0.5">Région</span>
+                        <span id="detail-region" class="text-slate-200 font-medium">---</span>
+                    </div>
+                    <div class="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800/80">
+                        <span class="text-slate-400 block mb-0.5">Période / Mois</span>
+                        <span id="detail-mois" class="text-pink-400 font-medium">---</span>
+                    </div>
+                </div>
+
+                <!-- Website Button -->
+                <div id="website-container" class="hidden">
+                    <a id="detail-website" href="#" target="_blank" rel="noopener noreferrer" 
+                        class="w-full py-2 px-4 rounded-lg bg-cyan-950/60 hover:bg-cyan-900/80 border border-cyan-500/40 text-cyan-300 text-xs font-display font-medium flex items-center justify-center space-x-2 transition shadow-lg shadow-cyan-950/50">
+                        <span>Visiter le site officiel</span>
+                        <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                    </a>
+                </div>
+
+                <!-- Description if available -->
+                <div id="description-container" class="hidden space-y-1">
+                    <h4 class="text-xs font-display uppercase tracking-wider text-slate-400">À propos</h4>
+                    <p id="detail-description" class="text-xs text-slate-300 leading-relaxed max-h-24 overflow-y-auto p-2.5 bg-slate-950/50 rounded-lg border border-slate-800/60"></p>
+                </div>
+
+                <!-- Genres & Interactive Network Selector -->
+                <div class="space-y-2 pt-2 border-t border-slate-800">
+                    <div class="flex justify-between items-center">
+                        <h4 class="text-xs font-display uppercase tracking-wider text-cyan-300">Genres & Réseau interactif</h4>
+                        <span class="text-[10px] text-slate-400">(Cliquez pour isoler un genre)</span>
+                    </div>
+                    <div id="detail-genres-container" class="flex flex-wrap gap-1.5">
+                        <!-- Genre badges inserted dynamically -->
+                    </div>
+                </div>
+
+                <!-- Active Network Info Box -->
+                <div class="p-3 rounded-lg bg-slate-950/80 border border-cyan-500/20 text-xs space-y-1">
+                    <div class="flex justify-between text-slate-400">
+                        <span>Genre affiché sur la carte :</span>
+                        <span id="active-genre-name" class="text-pink-400 font-bold">---</span>
+                    </div>
+                    <div class="flex justify-between text-slate-400">
+                        <span>Festivals connectés :</span>
+                        <span id="active-genre-count" class="text-cyan-400 font-mono font-bold">0</span>
+                    </div>
+                </div>
+
+                <!-- Unlock Selection Button -->
+                <button id="unlock-btn" class="w-full py-2 border border-slate-700 hover:border-slate-500 rounded-lg text-xs text-slate-300 hover:text-white transition flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-lock-open text-xs"></i>
+                    <span>Déverrouiller la sélection</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- FLOATING TOOLTIP FOR HOVER -->
+        <div id="hover-tooltip" class="absolute pointer-events-none z-30 opacity-0 transition-opacity duration-150 glass-panel px-3 py-2 rounded-lg border-cyan-500/40 text-xs shadow-xl space-y-0.5">
+            <div id="tooltip-title" class="font-bold text-white font-display"></div>
+            <div id="tooltip-commune" class="text-cyan-300 text-[11px]"></div>
+            <div id="tooltip-genre" class="text-pink-400 text-[10px] italic"></div>
+        </div>
+
     </div>
-  </div>
 
-  <!-- Scripts Libs -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
-  <script src="https://d3js.org/d3.v7.min.js"></script>
+    <!-- SCRIPT DE LOGIQUE ET CARTE INTERACTIVE -->
+    <script>
+        // Data URL provided by user
+        const DATASET_URL = 'https://raw.githubusercontent.com/Jean-Deluxe/s01e01_graphique_simple/refs/heads/main/festivals_cinema_684.json';
 
-  <script>
-    const DATA_URL = "https://raw.githubusercontent.com/Jean-Deluxe/s01e01_graphique_simple/refs/heads/main/festivals_cinema_684.json";
+        // State Management
+        let map;
+        let clusterGroup;
+        let rawFestivals = [];
+        let processedFestivals = [];
+        let genreColorMap = {};
+        let genreStats = {};
+        let selectedFestival = null;  // Locked festival on click
+        let hoveredFestival = null;   // Festival under mouse cursor
+        let activeNetworkGenre = null; // Currently visualised genre
+        let maxConnections = 20;       // Default limit for network lines
+        let canvasRenderer;
+        let networkPolylines = [];
 
-    let map;
-    let festivalsData = [];
-    let markerClusterGroup;
-    let festivalMarkers = new Map();
-    let genreColorMap = new Map();
-    let hoveredFestival = null;
+        // Neon color palette for genres and festivals
+        const NEON_PALETTE = [
+            '#00f3ff', '#ff007f', '#00ff88', '#ffcc00', '#ab47bc', 
+            '#ff5722', '#00e5ff', '#ff1744', '#76ff03', '#ffd600',
+            '#d500f9', '#1de9b6', '#ff9100', '#3d5aff', '#f44336'
+        ];
 
-    // Palette des genres
-    const GENRE_PALETTE = [
-      '#ff0055', '#00f3ff', '#ffcc00', '#00ff66', '#9900ff', 
-      '#ff6600', '#ff00aa', '#00ccff', '#ccff00', '#ff3366'
-    ];
+        // Initialize Map & Application
+        window.onload = function() {
+            initMap();
+            loadFestivalData();
+            setupEventListeners();
+        };
 
-    // Générateur de couleur unique par festival (String Hash HSL)
-    function getFestivalColor(name) {
-      let hash = 0;
-      for (let i = 0; i < name.length; i++) {
-        hash = name.charCodeAt(i) + ((hash << 5) - hash);
-      }
-      const h = Math.abs(hash) % 360;
-      return `hsl(${h}, 90%, 60%)`;
-    }
-
-    // Récupérer la couleur associée à un genre
-    function getGenreColor(genre) {
-      const g = genre.trim().toLowerCase();
-      if (!genreColorMap.has(g)) {
-        const color = GENRE_PALETTE[genreColorMap.size % GENRE_PALETTE.length];
-        genreColorMap.set(g, color);
-      }
-      return genreColorMap.get(g);
-    }
-
-    // Initialisation de la carte
-    function initMap() {
-      map = L.map('map', {
-        center: [46.603354, 1.888334], // Centre France
-        zoom: 6,
-        zoomControl: true
-      });
-
-      // Fond de carte sombre CartoDB Dark Matter
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; OpenStreetMap &copy; CARTO',
-        subdomains: 'abcd',
-        maxZoom: 19
-      }).addTo(map);
-
-      // Gestionnaire de Clusters personnalisé
-      markerClusterGroup = L.markerclusterGroup({
-        chunkedLoading: true,
-        maxClusterRadius: (zoom) => {
-          if (zoom <= 6) return 80;  // Niveau Région
-          if (zoom <= 9) return 50;  // Niveau Département
-          return 30;                 // Niveau Commune
-        },
-        iconCreateFunction: (cluster) => {
-          const count = cluster.getChildCount();
-          let size = 36 + Math.min(count / 5, 24);
-          return L.divIcon({
-            html: `<div class="marker-cluster-custom" style="width:${size}px; height:${size}px;"><span>${count}</span></div>`,
-            className: 'custom-cluster-icon',
-            iconSize: [size, size]
-          });
-        }
-      });
-
-      map.addLayer(markerClusterGroup);
-
-      // Suivi de l'échelle pour l'indicateur d'interface
-      map.on('zoomend', updateScaleIndicator);
-      map.on('move', drawNetworkLines);
-      window.addEventListener('resize', drawNetworkLines);
-
-      loadData();
-    }
-
-    // Mise à jour de l'étiquette d'échelle
-    function updateScaleIndicator() {
-      const zoom = map.getZoom();
-      const label = document.getElementById('scale-label');
-      if (zoom <= 6) {
-        label.innerText = "Échelle : Régions";
-      } else if (zoom <= 9) {
-        label.innerText = "Échelle : Départements";
-      } else {
-        label.innerText = "Échelle : Communes / Établissements";
-      }
-      drawNetworkLines();
-    }
-
-    // Chargement et traitement du JSON
-    async function loadData() {
-      try {
-        const res = await fetch(DATA_URL);
-        const rawData = await res.json();
-
-        // Filtrer les données valides
-        festivalsData = rawData.filter(d => {
-          const lat = parseFloat(d.geocodage_latitude || d.latitude || (d.yt_geocoding && d.yt_geocoding.lat));
-          const lon = parseFloat(d.geocodage_longitude || d.longitude || (d.yt_geocoding && d.yt_geocoding.lon));
-          return !isNaN(lat) && !isNaN(lon);
-        }).map((d, index) => {
-          const lat = parseFloat(d.geocodage_latitude || d.latitude || (d.yt_geocoding && d.yt_geocoding.lat));
-          const lon = parseFloat(d.geocodage_longitude || d.longitude || (d.yt_geocoding && d.yt_geocoding.lon));
-          
-          const genres = d.genres_texte_brut 
-            ? d.genres_texte_brut.split(',').map(g => g.trim()).filter(g => g.length > 0)
-            : ['Cinéma'];
-
-          return {
-            id: index,
-            nom: d.nom_du_festival || d.nom || "Festival de Cinéma",
-            region: d.region || d.region_principale || "Non spécifiée",
-            departement: d.departement || "Non spécifié",
-            commune: d.commune || d.commune_principale || "Non spécifiée",
-            annee: d.annee_de_creation_du_festival || d.annee_creation || "Inconnue",
-            site: d.site_internet || d.url || null,
-            genres: genres,
-            lat: lat,
-            lon: lon,
-            color: getFestivalColor(d.nom_du_festival || `fest-${index}`)
-          };
-        });
-
-        renderMarkers();
-      } catch (err) {
-        console.error("Erreur au chargement des festivals:", err);
-      }
-    }
-
-    // Rendu des Marqueurs sur la Carte
-    function renderMarkers() {
-      festivalMarkers.clear();
-      markerClusterGroup.clearLayers();
-
-      festivalsData.forEach(fest => {
-        const customIcon = L.divIcon({
-          className: 'custom-marker-wrapper',
-          html: `<div class="custom-marker" style="
-            background-color: ${fest.color};
-            width: 14px;
-            height: 14px;
-            border: 2px solid #fff;
-            box-shadow: 0 0 10px ${fest.color};
-          "></div>`,
-          iconSize: [14, 14],
-          iconAnchor: [7, 7]
-        });
-
-        const marker = L.marker([fest.lat, fest.lon], { icon: customIcon });
-        marker.festData = fest;
-
-        // Interaction au survol (Réseau par genre)
-        marker.on('mouseover', () => {
-          hoveredFestival = fest;
-          drawNetworkLines();
-        });
-
-        marker.on('mouseout', () => {
-          hoveredFestival = null;
-          clearNetworkLines();
-        });
-
-        // Clic : Afficher détails
-        marker.on('click', (e) => {
-          showDetailCard(fest);
-          L.DomEvent.stopPropagation(e);
-        });
-
-        festivalMarkers.set(fest.id, marker);
-        markerClusterGroup.addLayer(marker);
-      });
-    }
-
-    // Dessin des lignes de connexions réseau SVG (par genre partagé)
-    function drawNetworkLines() {
-      const svg = d3.select("#network-svg");
-      svg.selectAll("*").remove();
-
-      if (!hoveredFestival) return;
-
-      const sourcePoint = map.latLngToContainerPoint([hoveredFestival.lat, hoveredFestival.lon]);
-      const linesToDraw = [];
-
-      festivalsData.forEach(otherFest => {
-        if (otherFest.id === hoveredFestival.id) return;
-
-        // Trouver les genres partagés
-        const sharedGenres = hoveredFestival.genres.filter(g => 
-          otherFest.genres.some(og => og.toLowerCase() === g.toLowerCase())
-        );
-
-        if (sharedGenres.length > 0) {
-          const targetPoint = map.latLngToContainerPoint([otherFest.lat, otherFest.lon]);
-          
-          sharedGenres.forEach(genre => {
-            linesToDraw.push({
-              x1: sourcePoint.x,
-              y1: sourcePoint.y,
-              x2: targetPoint.x,
-              y2: targetPoint.y,
-              color: getGenreColor(genre),
-              genre: genre
+        // 1. Map Setup
+        function initMap() {
+            // Centered on France
+            map = L.map('map', {
+                center: [46.603354, 1.888334],
+                zoom: 6,
+                minZoom: 5,
+                maxZoom: 18,
+                zoomControl: false
             });
-          });
+
+            // Add Custom Zoom Control to top right
+            L.control.zoom({ position: 'topright' }).addTo(map);
+
+            // Dark Matter CartoDB Basemap
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+                subdomains: 'abcd',
+                maxZoom: 19
+            }).addTo(map);
+
+            // Canvas renderer for performance with lines
+            canvasRenderer = L.canvas({ padding: 0.5 });
+
+            // Initialize MarkerCluster Group with customized Cyberpunk Neon styling
+            clusterGroup = L.markerClusterGroup({
+                chunkedLoading: true,
+                maxClusterRadius: 50,
+                spiderfyOnMaxZoom: true,
+                showCoverageOnHover: false,
+                zoomToBoundsOnClick: true,
+                iconCreateFunction: function(cluster) {
+                    const count = cluster.getChildCount();
+                    let size = 34;
+                    if (count > 50) size = 48;
+                    else if (count > 20) size = 42;
+                    else if (count > 10) size = 38;
+
+                    return L.divIcon({
+                        html: `<div class="cyber-cluster" style="width:${size}px; height:${size}px;"><span>${count}</span></div>`,
+                        className: 'custom-cluster-icon',
+                        iconSize: L.point(size, size)
+                    });
+                }
+            });
+
+            map.addLayer(clusterGroup);
+
+            // Update scale level indicator on map zoom
+            map.on('zoomend', updateZoomIndicator);
         }
-      });
 
-      // Rendu SVG D3
-      svg.selectAll("line")
-        .data(linesToDraw)
-        .enter()
-        .append("line")
-        .attr("class", "network-line")
-        .attr("x1", d => d.x1)
-        .attr("y1", d => d.y1)
-        .attr("x2", d => d.x2)
-        .attr("y2", d => d.y2)
-        .attr("stroke", d => d.color);
-    }
+        // 2. Fetch and Normalize Data
+        async function loadFestivalData() {
+            try {
+                const response = await fetch(DATASET_URL);
+                if (!response.ok) throw new Error('Erreur de chargement des données');
+                rawFestivals = await response.json();
 
-    function clearNetworkLines() {
-      d3.select("#network-svg").selectAll("*").remove();
-    }
+                processFestivalsData();
+                populateGenreDropdown();
+                renderMarkers();
+                renderFestivalList(processedFestivals);
 
-    // Affichage de la Fiche Détail
-    function showDetailCard(fest) {
-      const card = document.getElementById('detail-card');
-      
-      document.getElementById('detail-title').innerText = fest.nom;
-      document.getElementById('detail-location').innerText = `${fest.commune} (${fest.departement}), ${fest.region}`;
-      document.getElementById('detail-year').innerText = fest.annee;
-      
-      const badge = document.getElementById('detail-badge');
-      badge.innerText = fest.region;
-      badge.style.backgroundColor = fest.color;
-      badge.style.color = '#000';
+                document.getElementById('stat-count').innerText = processedFestivals.length;
+            } catch (err) {
+                console.error("Erreur lors de l'initialisation du dataset:", err);
+            }
+        }
 
-      const genresContainer = document.getElementById('detail-genres');
-      genresContainer.innerHTML = '';
-      fest.genres.forEach(g => {
-        const tag = document.createElement('span');
-        tag.className = 'genre-tag';
-        tag.innerText = g;
-        tag.style.borderColor = getGenreColor(g);
-        genresContainer.appendChild(tag);
-      });
+        // Process raw festival JSON objects
+        function processFestivalsData() {
+            let genreSet = new Set();
 
-      const siteWrapper = document.getElementById('detail-site-wrapper');
-      const siteLink = document.getElementById('detail-site');
-      if (fest.site) {
-        siteLink.href = fest.site.startsWith('http') ? fest.site : `http://${fest.site}`;
-        siteWrapper.style.display = 'block';
-      } else {
-        siteWrapper.style.display = 'none';
-      }
+            processedFestivals = rawFestivals.map((item, idx) => {
+                // Extract coordinates (fallback check)
+                const lat = parseFloat(item.Lat || item.latitude || item.lat || 0);
+                const lon = parseFloat(item.Lon || item.longitude || item.lon || item.lng || 0);
 
-      card.classList.add('active');
-    }
+                // Parse genres text
+                const genresRaw = item.genres_texte_brut || item.genre || 'Cinéma';
+                const genres = genresRaw
+                    .split(',')
+                    .map(g => g.trim())
+                    .filter(g => g.length > 0);
 
-    function closeDetailCard() {
-      document.getElementById('detail-card').classList.remove('active');
-    }
+                // Collect genres for global stats
+                genres.forEach(g => {
+                    genreSet.add(g);
+                    genreStats[g] = (genreStats[g] || 0) + 1;
+                });
 
-    // Démarrage
-    window.onload = initMap;
-  </script>
+                // Unique deterministic festival color based on index & name string
+                const colorHex = NEON_PALETTE[stringHash(item.nom_du_festival || item.nom || ('fest_' + idx)) % NEON_PALETTE.length];
+
+                return {
+                    id: idx,
+                    name: item.nom_du_festival || item.nom || 'Festival Sans Nom',
+                    commune: item.commune_principale || item.commune || item.ville || 'Commune non spécifiée',
+                    departement: item.departement || item.dep || '',
+                    region: item.region || item.reg || 'France',
+                    mois: item.mois_habituel_de_deroulement || item.mois || 'Non précisé',
+                    website: item.site_web || item.url || null,
+                    description: item.texte_presentation || item.description || null,
+                    lat: lat,
+                    lon: lon,
+                    genres: genres.length > 0 ? genres : ['Cinéma'],
+                    primaryGenre: genres[0] || 'Cinéma',
+                    uniqueColor: colorHex,
+                    raw: item
+                };
+            }).filter(f => !isNaN(f.lat) && !isNaN(f.lon) && f.lat !== 0 && f.lon !== 0);
+
+            // Assign unique colors to genres dynamically
+            Array.from(genreSet).sort().forEach((genre, idx) => {
+                genreColorMap[genre] = NEON_PALETTE[idx % NEON_PALETTE.length];
+            });
+        }
+
+        // Generate deterministic hash from string
+        function stringHash(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = str.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            return Math.abs(hash);
+        }
+
+        // Calculate Haversine distance between 2 GPS points (in km)
+        function getHaversineDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Radius of Earth in km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        // 3. Render Leaflet Markers
+        function renderMarkers(filteredList = null) {
+            clusterGroup.clearLayers();
+            clearNetworkLines();
+
+            const listToRender = filteredList || processedFestivals;
+
+            listToRender.forEach(fest => {
+                // Marker SVG icon with unique festival neon color
+                const iconHtml = `
+                    <div class="relative group" style="transform: translate(-50%, -50%);">
+                        <div class="w-4 h-4 rounded-full border-2 border-white shadow-[0_0_10px_${fest.uniqueColor}]" style="background-color: ${fest.uniqueColor};"></div>
+                    </div>
+                `;
+
+                const customIcon = L.divIcon({
+                    html: iconHtml,
+                    className: 'fest-marker-icon',
+                    iconSize: [16, 16],
+                    iconAnchor: [8, 8]
+                });
+
+                const marker = L.marker([fest.lat, fest.lon], { icon: customIcon });
+                marker.festivalData = fest;
+
+                // Mouse Events
+                marker.on('mouseover', (e) => handleMarkerHover(fest, e));
+                marker.on('mouseout', handleMarkerOut);
+                marker.on('click', (e) => {
+                    L.DomEvent.stopPropagation(e);
+                    selectFestival(fest);
+                });
+
+                clusterGroup.addLayer(marker);
+            });
+
+            document.getElementById('visible-list-count').innerText = listToRender.length;
+        }
+
+        // 4. Network Lines Drawing Engine
+        function drawNetworkLines(targetFestival, genreToHighlight) {
+            clearNetworkLines();
+
+            if (!targetFestival || !genreToHighlight) return;
+
+            // Find all other festivals sharing this genre
+            let matchingFestivals = processedFestivals.filter(f => 
+                f.id !== targetFestival.id && f.genres.includes(genreToHighlight)
+            );
+
+            // Sort by geographical distance to target festival
+            matchingFestivals.sort((a, b) => {
+                const distA = getHaversineDistance(targetFestival.lat, targetFestival.lon, a.lat, a.lon);
+                const distB = getHaversineDistance(targetFestival.lat, targetFestival.lon, b.lat, b.lon);
+                return distA - distB;
+            });
+
+            // Limit by user-selected max connections
+            if (maxConnections < 999) {
+                matchingFestivals = matchingFestivals.slice(0, maxConnections);
+            }
+
+            const genreColor = genreColorMap[genreToHighlight] || '#00f3ff';
+
+            // Draw glowing network lines
+            matchingFestivals.forEach(otherFest => {
+                const polyline = L.polyline(
+                    [[targetFestival.lat, targetFestival.lon], [otherFest.lat, otherFest.lon]],
+                    {
+                        color: genreColor,
+                        weight: 2,
+                        opacity: 0.75,
+                        dashArray: '6, 6',
+                        renderer: canvasRenderer
+                    }
+                ).addTo(map);
+
+                networkPolylines.push(polyline);
+            });
+
+            // Update network info counters in details panel
+            document.getElementById('active-genre-name').innerText = genreToHighlight;
+            document.getElementById('active-genre-name').style.color = genreColor;
+            document.getElementById('active-genre-count').innerText = matchingFestivals.length;
+        }
+
+        function clearNetworkLines() {
+            networkPolylines.forEach(line => map.removeLayer(line));
+            networkPolylines = [];
+        }
+
+        // 5. Hover & Selection Interactions
+        function handleMarkerHover(festival, event) {
+            hoveredFestival = festival;
+
+            // Show Floating Tooltip
+            const tooltip = document.getElementById('hover-tooltip');
+            document.getElementById('tooltip-title').innerText = festival.name;
+            document.getElementById('tooltip-commune').innerText = `${festival.commune} (${festival.departement})`;
+            document.getElementById('tooltip-genre').innerText = `Genre: ${festival.primaryGenre}`;
+
+            tooltip.style.left = `${event.originalEvent.clientX + 15}px`;
+            tooltip.style.top = `${event.originalEvent.clientY + 15}px`;
+            tooltip.classList.remove('opacity-0');
+
+            // Draw network lines if no festival is locked by click
+            if (!selectedFestival) {
+                activeNetworkGenre = festival.primaryGenre;
+                drawNetworkLines(festival, festival.primaryGenre);
+            }
+        }
+
+        function handleMarkerOut() {
+            hoveredFestival = null;
+            const tooltip = document.getElementById('hover-tooltip');
+            tooltip.classList.add('opacity-0');
+
+            // Clear network lines if no festival is locked by click
+            if (!selectedFestival) {
+                clearNetworkLines();
+                document.getElementById('active-genre-name').innerText = '---';
+                document.getElementById('active-genre-count').innerText = '0';
+            }
+        }
+
+        // Lock festival selection on click
+        function selectFestival(festival, activeGenreOverride = null) {
+            selectedFestival = festival;
+            activeNetworkGenre = activeGenreOverride || festival.primaryGenre;
+
+            // Update Right Sidebar Panel UI
+            document.getElementById('detail-title').innerText = festival.name;
+            document.getElementById('detail-commune').innerText = `${festival.commune} ${festival.departement ? '(' + festival.departement + ')' : ''}`;
+            document.getElementById('detail-region').innerText = festival.region;
+            document.getElementById('detail-mois').innerText = festival.mois;
+            document.getElementById('detail-color-dot').style.backgroundColor = festival.uniqueColor;
+            document.getElementById('detail-color-dot').style.boxShadow = `0 0 10px ${festival.uniqueColor}`;
+
+            // Website link
+            const webContainer = document.getElementById('website-container');
+            if (festival.website && festival.website.trim() !== '') {
+                let url = festival.website.trim();
+                if (!url.startsWith('http')) url = 'https://' + url;
+                document.getElementById('detail-website').href = url;
+                webContainer.classList.remove('hidden');
+            } else {
+                webContainer.classList.add('hidden');
+            }
+
+            // Description
+            const descContainer = document.getElementById('description-container');
+            if (festival.description && festival.description.trim() !== '') {
+                document.getElementById('detail-description').innerText = festival.description;
+                descContainer.classList.remove('hidden');
+            } else {
+                descContainer.classList.add('hidden');
+            }
+
+            // Render interactive genre badges for this festival
+            const genresContainer = document.getElementById('detail-genres-container');
+            genresContainer.innerHTML = '';
+            festival.genres.forEach(genre => {
+                const isSelected = (genre === activeNetworkGenre);
+                const badgeColor = genreColorMap[genre] || '#00f3ff';
+                const badge = document.createElement('button');
+                badge.className = `px-2.5 py-1 rounded-full text-xs font-display font-medium transition flex items-center space-x-1.5 ${
+                    isSelected 
+                        ? 'bg-cyan-400 text-slate-950 font-bold shadow-[0_0_10px_rgba(0,243,255,0.6)]' 
+                        : 'bg-slate-900 border border-slate-700 text-slate-300 hover:border-cyan-400'
+                }`;
+                badge.innerHTML = `
+                    <span class="w-2 h-2 rounded-full" style="background-color:${badgeColor}"></span>
+                    <span>${genre}</span>
+                `;
+
+                badge.onclick = () => {
+                    selectFestival(festival, genre);
+                };
+
+                genresContainer.appendChild(badge);
+            });
+
+            // Open Right Sidebar Panel
+            const rightPanel = document.getElementById('right-panel');
+            rightPanel.classList.remove('translate-x-[120%]');
+
+            // Draw network lines for locked selection
+            drawNetworkLines(festival, activeNetworkGenre);
+
+            // Center map smoothly on festival location
+            map.flyTo([festival.lat, festival.lon], Math.max(map.getZoom(), 9), {
+                duration: 1.2
+            });
+        }
+
+        function unlockSelection() {
+            selectedFestival = null;
+            activeNetworkGenre = null;
+            clearNetworkLines();
+            document.getElementById('right-panel').classList.add('translate-x-[120%]');
+            document.getElementById('active-genre-name').innerText = '---';
+            document.getElementById('active-genre-count').innerText = '0';
+        }
+
+        // 6. UI Helpers & Event Listeners
+        function populateGenreDropdown() {
+            const select = document.getElementById('genre-select');
+            const sortedGenres = Object.keys(genreStats).sort();
+
+            sortedGenres.forEach(genre => {
+                const opt = document.createElement('option');
+                opt.value = genre;
+                opt.innerText = `${genre} (${genreStats[genre]})`;
+                select.appendChild(opt);
+            });
+        }
+
+        function filterData() {
+            const searchQuery = document.getElementById('search-input').value.toLowerCase().trim();
+            const selectedGenre = document.getElementById('genre-select').value;
+
+            const filtered = processedFestivals.filter(f => {
+                const matchesSearch = !searchQuery || 
+                    f.name.toLowerCase().includes(searchQuery) ||
+                    f.commune.toLowerCase().includes(searchQuery) ||
+                    f.region.toLowerCase().includes(searchQuery) ||
+                    f.departement.toLowerCase().includes(searchQuery);
+
+                const matchesGenre = !selectedGenre || f.genres.includes(selectedGenre);
+
+                return matchesSearch && matchesGenre;
+            });
+
+            renderMarkers(filtered);
+            renderFestivalList(filtered);
+        }
+
+        function renderFestivalList(list) {
+            const container = document.getElementById('festival-list');
+            container.innerHTML = '';
+
+            if (list.length === 0) {
+                container.innerHTML = `<div class="p-4 text-center text-xs text-slate-500">Aucun festival trouvé</div>`;
+                return;
+            }
+
+            list.slice(0, 100).forEach(fest => {
+                const item = document.createElement('div');
+                item.className = 'p-2 rounded-lg hover:bg-slate-800/60 cursor-pointer transition flex items-center justify-between group';
+                item.innerHTML = `
+                    <div class="overflow-hidden pr-2">
+                        <div class="text-xs font-medium text-slate-200 group-hover:text-cyan-300 truncate">${fest.name}</div>
+                        <div class="text-[10px] text-slate-400 truncate">${fest.commune} • ${fest.primaryGenre}</div>
+                    </div>
+                    <span class="w-2 h-2 rounded-full shrink-0" style="background-color: ${fest.uniqueColor}"></span>
+                `;
+
+                item.onclick = () => selectFestival(fest);
+                container.appendChild(item);
+            });
+        }
+
+        function updateZoomIndicator() {
+            const zoom = map.getZoom();
+            const textEl = document.getElementById('zoom-level-text');
+            if (zoom <= 6) textEl.innerText = 'Vue Nationale';
+            else if (zoom <= 8) textEl.innerText = 'Échelle Régionale';
+            else if (zoom <= 11) textEl.innerText = 'Échelle Départementale';
+            else textEl.innerText = 'Échelle Locale / Communes';
+        }
+
+        function setupEventListeners() {
+            // Search Input & Clear
+            const searchInput = document.getElementById('search-input');
+            const clearBtn = document.getElementById('clear-search');
+
+            searchInput.addEventListener('input', () => {
+                if (searchInput.value.length > 0) clearBtn.classList.remove('hidden');
+                else clearBtn.classList.add('hidden');
+                filterData();
+            });
+
+            clearBtn.addEventListener('click', () => {
+                searchInput.value = '';
+                clearBtn.classList.add('hidden');
+                filterData();
+            });
+
+            // Genre Dropdown Filter
+            document.getElementById('genre-select').addEventListener('change', filterData);
+
+            // Connection Limit Buttons
+            document.querySelectorAll('.limit-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelectorAll('.limit-btn').forEach(b => {
+                        b.classList.remove('active', 'bg-cyan-950', 'border-cyan-400', 'text-cyan-300', 'font-bold');
+                        b.classList.add('bg-slate-900', 'border-slate-700', 'text-slate-300');
+                    });
+                    e.target.classList.add('active', 'bg-cyan-950', 'border-cyan-400', 'text-cyan-300', 'font-bold');
+                    maxConnections = parseInt(e.target.getAttribute('data-limit'));
+                    
+                    document.getElementById('connection-limit-val').innerText = maxConnections === 999 ? 'Toutes' : `${maxConnections} proches`;
+
+                    // Re-draw current network lines
+                    if (selectedFestival && activeNetworkGenre) {
+                        drawNetworkLines(selectedFestival, activeNetworkGenre);
+                    } else if (hoveredFestival && activeNetworkGenre) {
+                        drawNetworkLines(hoveredFestival, activeNetworkGenre);
+                    }
+                });
+            });
+
+            // Close & Unlock Buttons
+            document.getElementById('close-panel-btn').addEventListener('click', unlockSelection);
+            document.getElementById('unlock-btn').addEventListener('click', unlockSelection);
+
+            // Click outside map to unlock selection
+            map.on('click', () => {
+                if (selectedFestival) unlockSelection();
+            });
+        }
+    </script>
 </body>
 </html>
